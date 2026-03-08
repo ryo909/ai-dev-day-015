@@ -1,263 +1,216 @@
-/**
- * AI個人開発実験 — Dayテンプレート ロジック
- *
- * - meta.json から表示情報を読み込み
- * - theme は CSS variables を適用
- * - 入力→処理→出力のベースを提供
- * - selected_components に応じて安全な component packs を追加
- */
-
-import { loadMeta } from './lib/meta';
-import {
-  buildComponentPackManifest,
-  publishComponentPackManifest,
-  resolveSelectedComponents
-} from './lib/componentPacks';
-import { createComparisonViewPack } from './components/packs/comparisonView';
-import { createExportSuitePack } from './components/packs/exportSuite';
-import { createHistoryPanelPack } from './components/packs/historyPanel';
-import { createLocalStoragePack } from './components/packs/localStorage';
-import { createReasonPanelPack } from './components/packs/reasonPanel';
-import { createSampleInputsPack } from './components/packs/sampleInputs';
-import { createStepUiPack } from './components/packs/stepUi';
-import { applyTheme } from './themes';
 import './style.css';
-
-const meta = loadMeta();
-applyTheme(meta.theme);
-
-document.documentElement.setAttribute('data-complexity-tier', meta.complexity_tier || 'small');
-
-const headerBadge = document.getElementById('headerBadge');
-const headerTitle = document.getElementById('headerTitle');
-const headerDesc = document.getElementById('headerDesc');
-const footerDay = document.getElementById('footerDay');
+const PROFILE = {"day":"Day015","title":"Constraint Challenge Dealer","one_sentence":"制約付きのお題を瞬時に作るミニチャレンジ生成ツール。（話題:HN Frontpage）","core_action":"deal","family":"constraint_game","mechanic":"rule_combination","input_style":"constraints","output_style":"challenge_cards","audience_promise":"fresh_short_breaks","publish_hook":"30秒で遊べる制約チャレンジ","engine":"constraint_game"};
 const actionBtn = document.getElementById('actionBtn');
 const toolInput = document.getElementById('toolInput');
 const toolOutput = document.getElementById('toolOutput');
 const outputGroup = document.getElementById('outputGroup');
-const toolArea = document.querySelector('.tool-area');
-const inputGroup = document.querySelector('.input-group');
 
-headerBadge.textContent = meta.day || 'DayXXX';
-headerTitle.textContent = meta.title || 'Untitled Tool';
-headerDesc.textContent = meta.description || '説明をここに';
-footerDay.textContent = `${meta.day || 'DayXXX'} / #100日開発`;
-
-const storageSlug = (meta.repo_name || meta.title || 'tool')
-  .toLowerCase()
-  .replace(/[^a-z0-9-_]+/g, '-')
-  .replace(/^-+|-+$/g, '') || 'tool';
-const storageKey = `ai-dev-exp-template:${storageSlug}`;
-
-const state = {
-  input: '',
-  result: '',
-  history: []
-};
-
-const packControllers = [];
-const renderedComponentNames = [];
-let localStoragePack = null;
-
-const selectedComponents = resolveSelectedComponents(meta);
+actionBtn.addEventListener('click', () => {
+  const input = (toolInput.value || '').trim();
+  if (!input) {
+    showOutput('⚠ 入力を入れてください', 'warning');
+    return;
+  }
+  const result = processInput(input);
+  showOutput(result, 'success');
+});
 
 function processInput(input) {
-  const charCount = input.length;
-  const wordCount = input.split(/\s+/).filter(Boolean).length;
-  const lineCount = input.split('\n').length;
+  switch (PROFILE.engine) {
+    case 'json_paths':
+      return renderJsonPaths(input);
+    case 'agenda_builder':
+      return buildAgenda(input);
+    case 'risk_matrix':
+      return buildRiskMatrix(input);
+    case 'decision_brief':
+      return buildDecisionBrief(input);
+    case 'checklist_builder':
+      return buildChecklist(input);
+    case 'qa_rotator':
+      return buildQuestionRotation(input);
+    case 'habit_slots':
+      return buildHabitSlots(input);
+    case 'triage_router':
+      return buildTriage(input);
+    case 'copy_angle':
+      return buildCopyAngles(input);
+    case 'story_weaver':
+      return buildStoryOutline(input);
+    case 'constraint_game':
+      return buildConstraints(input);
+    case 'incident_card':
+      return buildIncidentCard(input);
+    default:
+      return fallbackAnalyze(input);
+  }
+}
 
-  return `Analysis:\n- Characters: ${charCount}\n- Words: ${wordCount}\n- Lines: ${lineCount}`;
+function renderJsonPaths(input) {
+  let obj;
+  try {
+    obj = JSON.parse(input);
+  } catch (e) {
+    return 'JSONとして解釈できませんでした。まずJSON形式で入力してください。';
+  }
+  const rows = [];
+  walk(obj, '$', rows);
+  return ['JSON path summary:', ...rows.slice(0, 80)].join('\\n');
+}
+
+function walk(node, path, rows) {
+  if (Array.isArray(node)) {
+    rows.push(`${path} : array(${node.length})`);
+    node.forEach((x, i) => walk(x, `${path}[${i}]`, rows));
+    return;
+  }
+  if (node && typeof node === 'object') {
+    rows.push(`${path} : object`);
+    Object.keys(node).forEach((k) => walk(node[k], `${path}.${k}`, rows));
+    return;
+  }
+  rows.push(`${path} : ${typeof node}`);
+}
+
+function splitLines(input) {
+  return input.split(/\\n+/).map((x) => x.trim()).filter(Boolean);
+}
+
+function buildAgenda(input) {
+  const topics = splitLines(input);
+  const per = Math.max(5, Math.floor(45 / Math.max(topics.length, 1)));
+  const lines = topics.map((t, i) => `${String(i + 1).padStart(2, '0')}. ${t} (${per}分)`);
+  return ['Agenda draft:', ...lines, 'Closing: 決定事項と担当を1分で確認'].join('\\n');
+}
+
+function buildRiskMatrix(input) {
+  const rows = splitLines(input).map((line) => {
+    const [name, impactRaw, probRaw] = line.split('|').map((x) => (x || '').trim());
+    const impact = Number(impactRaw || 3);
+    const prob = Number(probRaw || 3);
+    const score = impact * prob;
+    return { name: name || line, impact, prob, score };
+  }).sort((a, b) => b.score - a.score);
+  const out = rows.map((r, i) => `${i + 1}. ${r.name} | impact=${r.impact} prob=${r.prob} score=${r.score}`);
+  return ['Risk priority:', ...out.slice(0, 20)].join('\\n');
+}
+
+function buildDecisionBrief(input) {
+  const rows = splitLines(input);
+  const outline = rows.map((x, i) => `${i + 1}) ${x}`);
+  return [
+    'Decision memo draft',
+    '背景: 何を決めるかを1行で明記',
+    '選択肢:',
+    ...outline,
+    '採用理由: 影響と実行速度のバランス',
+    '却下理由: 維持コストまたはリスクが高い'
+  ].join('\\n');
+}
+
+function buildChecklist(input) {
+  const rows = splitLines(input);
+  const checks = rows.map((x, i) => `- [ ] ${x} を確認する (${i + 1})`);
+  return ['Checklist:', ...checks.slice(0, 30)].join('\\n');
+}
+
+function buildQuestionRotation(input) {
+  const rows = splitLines(input);
+  const out = [];
+  rows.forEach((x) => {
+    out.push(`基礎: ${x}とは?`);
+    out.push(`応用: ${x}を使う判断基準は?`);
+    out.push(`確認: ${x}を説明できるか?`);
+  });
+  return ['Question rotation:', ...out.slice(0, 24)].join('\\n');
+}
+
+function buildHabitSlots(input) {
+  const rows = splitLines(input);
+  if (rows.length === 0) {
+    return '条件を1行以上入力してください。';
+  }
+  return [
+    'Habit slots:',
+    '朝: 5分の準備タスク',
+    '昼: 進捗確認',
+    '夜: 翌日の障害を1つ潰す',
+    `メモ: ${rows[0]}`
+  ].join('\\n');
+}
+
+function buildTriage(input) {
+  const rows = splitLines(input);
+  const lanes = { now: [], later: [], delegate: [] };
+  rows.forEach((r, i) => {
+    if (i % 3 === 0) lanes.now.push(r);
+    else if (i % 3 === 1) lanes.later.push(r);
+    else lanes.delegate.push(r);
+  });
+  return [
+    'Triage lanes:',
+    '[Now]', ...lanes.now.map((x) => `- ${x}`),
+    '[Later]', ...lanes.later.map((x) => `- ${x}`),
+    '[Delegate]', ...lanes.delegate.map((x) => `- ${x}`)
+  ].join('\\n');
+}
+
+function buildCopyAngles(input) {
+  const seed = splitLines(input).slice(0, 3).join(' / ');
+  return [
+    'Copy angles:',
+    `1) 課題起点: ${seed} で困る時間を減らす`,
+    `2) 成果起点: ${seed} を最短で形にする`,
+    `3) 安心起点: ${seed} のミスを事前に防ぐ`
+  ].join('\\n');
+}
+
+function buildStoryOutline(input) {
+  const rows = splitLines(input);
+  return [
+    'STAR outline:',
+    `S: ${rows[0] || '背景を1行で記述'}`,
+    `T: ${rows[1] || '目標を1行で記述'}`,
+    `A: ${rows[2] || '取った行動を3点で記述'}`,
+    `R: ${rows[3] || '成果を数値で記述'}`
+  ].join('\\n');
+}
+
+function buildConstraints(input) {
+  const rows = splitLines(input);
+  const base = rows[0] || input;
+  return [
+    'Challenge cards:',
+    `- 5分: ${base} で1つ作る`,
+    `- 10分: ${base} を2通りで試す`,
+    `- 15分: ${base} を他人に説明する`
+  ].join('\\n');
+}
+
+function buildIncidentCard(input) {
+  const rows = splitLines(input);
+  return [
+    'Incident first-response card:',
+    `1. 事象要約: ${rows[0] || '症状を1行で記述'}`,
+    '2. 影響範囲を確認',
+    '3. 一時回避策を定義',
+    '4. 恒久対応の仮説を列挙',
+    '5. 共有先と次回更新時刻を明記'
+  ].join('\\n');
+}
+
+function fallbackAnalyze(input) {
+  const chars = input.length;
+  const lines = input.split('\\n').length;
+  const words = input.split(/\\s+/).filter(Boolean).length;
+  return `分析結果\\n- chars: ${chars}\\n- words: ${words}\\n- lines: ${lines}`;
 }
 
 function showOutput(content, type = 'info') {
   outputGroup.style.display = '';
   toolOutput.className = `output-area output-${type}`;
   toolOutput.textContent = content;
-
   outputGroup.style.animation = 'none';
   outputGroup.offsetHeight;
-  outputGroup.style.animation = 'fadeSlideIn 0.25s ease';
+  outputGroup.style.animation = 'fadeSlideIn 0.3s ease';
 }
-
-function getSnapshot() {
-  return {
-    input: state.input,
-    result: state.result,
-    history: state.history.slice(0, 5)
-  };
-}
-
-function notifyPacks(eventName) {
-  const payload = {
-    eventName,
-    input: state.input,
-    result: state.result,
-    history: state.history.slice(0, 5)
-  };
-
-  packControllers.forEach((controller) => {
-    if (typeof controller.update === 'function') {
-      controller.update(payload);
-    }
-  });
-
-  if (eventName === 'run' && localStoragePack && typeof localStoragePack.save === 'function') {
-    localStoragePack.save(getSnapshot());
-  }
-}
-
-function setInputValue(value) {
-  toolInput.value = value;
-  state.input = value;
-  notifyPacks('input');
-}
-
-function applyRunResult(inputText, outputText) {
-  state.input = inputText;
-  state.result = outputText;
-
-  const entry = {
-    input: inputText,
-    result: outputText,
-    timestamp: Date.now()
-  };
-
-  state.history = [entry, ...state.history].slice(0, 5);
-  showOutput(outputText, 'success');
-  notifyPacks('run');
-}
-
-function restoreSnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') {
-    return;
-  }
-
-  if (typeof snapshot.input === 'string') {
-    toolInput.value = snapshot.input;
-    state.input = snapshot.input;
-  }
-
-  if (typeof snapshot.result === 'string' && snapshot.result) {
-    state.result = snapshot.result;
-    showOutput(snapshot.result, 'success');
-  }
-
-  if (Array.isArray(snapshot.history)) {
-    state.history = snapshot.history
-      .filter((item) => item && typeof item.input === 'string' && typeof item.result === 'string')
-      .slice(0, 5);
-  }
-
-  notifyPacks('restore');
-}
-
-function registerPack(controller, mountPoint, beforeNode = null) {
-  if (!controller || !controller.element || !mountPoint) {
-    return;
-  }
-
-  if (beforeNode) {
-    mountPoint.insertBefore(controller.element, beforeNode);
-  } else {
-    mountPoint.appendChild(controller.element);
-  }
-  renderedComponentNames.push(controller.name);
-
-  if (typeof controller.update === 'function') {
-    packControllers.push(controller);
-  }
-}
-
-const packArea = document.createElement('section');
-packArea.className = `pack-area pack-tier-${meta.complexity_tier || 'small'}`;
-toolArea.appendChild(packArea);
-
-if (selectedComponents.includes('step_ui')) {
-  const stepPack = createStepUiPack({ meta });
-  registerPack(stepPack, toolArea, inputGroup);
-}
-
-if (selectedComponents.includes('sample_inputs')) {
-  const samplePack = createSampleInputsPack({
-    meta,
-    inputElement: toolInput,
-    onSamplePick: (value) => {
-      state.input = value;
-      notifyPacks('sample');
-    }
-  });
-
-  registerPack(samplePack, inputGroup);
-}
-
-if (selectedComponents.includes('reason_panel')) {
-  const reasonPack = createReasonPanelPack({ meta });
-  registerPack(reasonPack, packArea);
-}
-
-if (selectedComponents.includes('local_storage')) {
-  localStoragePack = createLocalStoragePack({
-    storageKey,
-    getSnapshot,
-    restoreSnapshot
-  });
-
-  registerPack(localStoragePack, packArea);
-
-  const loaded = localStoragePack.load();
-  if (loaded) {
-    restoreSnapshot(loaded);
-  }
-}
-
-if (selectedComponents.includes('comparison_view')) {
-  const comparisonPack = createComparisonViewPack({ analyzeInput: processInput });
-  registerPack(comparisonPack, packArea);
-}
-
-if (selectedComponents.includes('history_panel')) {
-  const historyPack = createHistoryPanelPack({
-    onHistoryPick: (entry) => {
-      if (!entry || typeof entry.input !== 'string' || typeof entry.result !== 'string') {
-        return;
-      }
-
-      toolInput.value = entry.input;
-      state.input = entry.input;
-      state.result = entry.result;
-      showOutput(entry.result, 'success');
-      notifyPacks('history-pick');
-    }
-  });
-  registerPack(historyPack, packArea);
-}
-
-if (selectedComponents.includes('export_suite')) {
-  const exportPack = createExportSuitePack({ getSnapshot });
-  registerPack(exportPack, packArea);
-}
-
-const manifest = buildComponentPackManifest(meta, renderedComponentNames);
-publishComponentPackManifest(manifest);
-
-actionBtn.addEventListener('click', () => {
-  const input = toolInput.value.trim();
-
-  if (!input) {
-    state.input = '';
-    showOutput('Please enter input text.', 'warning');
-    notifyPacks('warning');
-    return;
-  }
-
-  const result = processInput(input);
-  applyRunResult(input, result);
-});
-
-toolInput.addEventListener('input', () => {
-  state.input = toolInput.value;
-  notifyPacks('input');
-});
-
-notifyPacks('init');
