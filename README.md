@@ -1,29 +1,29 @@
-# Day015 — Constraint Challenge Dealer
+# Day015 — Constraint Roulette
 
-> 制約付きのお題を瞬時に作るミニチャレンジ生成ツール。（話題:HN Frontpage）
+> 制約ミッションをルーレットで引いて遊ぶチャレンジゲーム。（話題:HN Frontpage）
 >
 > Complexity Tier: small
 >
 > Selected Components: none
 >
-> Family / Mechanic: constraint_game / rule_combination
+> Family / Mechanic: roulette_challenge / random_spin
 >
-> Input -> Output: constraints -> challenge_cards
+> Input -> Output: preset_pool -> roulette_result
 >
-> Audience Promise: fresh_short_breaks
+> Audience Promise: high_short_burst_engagement
 
 ## 使い方
 
 1. ページを開く
-2. 制約条件を入力する
-3. 「実行する」を実行する
-4. チャレンジお題を確認して必要に応じて再入力する
+2. ミッション候補を入力する
+3. 「スピンする」を実行する
+4. ラウンド結果を確認して必要に応じて再入力する
 
 ## Story
 
 - [制作ストーリー](./STORY.md)
 - Complexity hint: Keep the tool single-purpose and stable. Add at most one safe enhancement component.
-- Publish hook: 30秒で遊べる制約チャレンジ
+- Publish hook: 回すたびに制約ミッションが変わる
 
 ## Demo
 

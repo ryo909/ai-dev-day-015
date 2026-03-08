@@ -1,216 +1,276 @@
 import './style.css';
-const PROFILE = {"day":"Day015","title":"Constraint Challenge Dealer","one_sentence":"制約付きのお題を瞬時に作るミニチャレンジ生成ツール。（話題:HN Frontpage）","core_action":"deal","family":"constraint_game","mechanic":"rule_combination","input_style":"constraints","output_style":"challenge_cards","audience_promise":"fresh_short_breaks","publish_hook":"30秒で遊べる制約チャレンジ","engine":"constraint_game"};
-const actionBtn = document.getElementById('actionBtn');
-const toolInput = document.getElementById('toolInput');
-const toolOutput = document.getElementById('toolOutput');
-const outputGroup = document.getElementById('outputGroup');
+const PROFILE = {"day":"Day015","title":"Constraint Roulette","one_sentence":"制約ミッションをルーレットで引いて遊ぶチャレンジゲーム。（話題:HN Frontpage）","core_action":"play","family":"roulette_challenge","mechanic":"random_spin","input_style":"preset_pool","output_style":"roulette_result","audience_promise":"high_short_burst_engagement","publish_hook":"回すたびに制約ミッションが変わる","engine":"roulette_game","interaction_archetype":"challenge_roulette_game","page_archetype":"game_stage","output_shape":"round_result_cards","state_model":"round_history_and_score","core_loop":"spin -> challenge -> score","component_pack":"roulette_wheel+score_panel","scaffold_id":"roulette_game","single_shot_text_generator":false};
+const byId = (id) => document.getElementById(id);
+const state = {
+  tokens: ['UI', 'API', 'Habit', 'Team'],
+  lock: false,
+  history: [],
+  wizardStep: 0,
+  wizardAnswers: {},
+  matrix: { HH: [], HL: [], LH: [], LL: [] },
+  options: [],
+  slots: { morning: [], afternoon: [], evening: [] },
+  board: { todo: [], doing: [], done: [] },
+  missions: ['5分で試す', '2案比較する', '短文で説明する'],
+  score: 0,
+  round: 0
+};
 
-actionBtn.addEventListener('click', () => {
-  const input = (toolInput.value || '').trim();
-  if (!input) {
-    showOutput('⚠ 入力を入れてください', 'warning');
-    return;
-  }
-  const result = processInput(input);
-  showOutput(result, 'success');
-});
+boot();
 
-function processInput(input) {
-  switch (PROFILE.engine) {
-    case 'json_paths':
-      return renderJsonPaths(input);
-    case 'agenda_builder':
-      return buildAgenda(input);
-    case 'risk_matrix':
-      return buildRiskMatrix(input);
-    case 'decision_brief':
-      return buildDecisionBrief(input);
-    case 'checklist_builder':
-      return buildChecklist(input);
-    case 'qa_rotator':
-      return buildQuestionRotation(input);
-    case 'habit_slots':
-      return buildHabitSlots(input);
-    case 'triage_router':
-      return buildTriage(input);
-    case 'copy_angle':
-      return buildCopyAngles(input);
-    case 'story_weaver':
-      return buildStoryOutline(input);
-    case 'constraint_game':
-      return buildConstraints(input);
-    case 'incident_card':
-      return buildIncidentCard(input);
-    default:
-      return fallbackAnalyze(input);
+function boot() {
+  switch (PROFILE.scaffold_id) {
+    case 'card_deck_board': return setupCardDeck();
+    case 'wizard_stepper': return setupWizard();
+    case 'matrix_mapper': return setupMatrix();
+    case 'weighted_calculator': return setupWeightedCalc();
+    case 'slot_checklist_planner': return setupSlotPlanner();
+    case 'flow_board': return setupFlowBoard();
+    case 'roulette_game': return setupRoulette();
+    default: return setupFallback();
   }
 }
 
-function renderJsonPaths(input) {
-  let obj;
-  try {
-    obj = JSON.parse(input);
-  } catch (e) {
-    return 'JSONとして解釈できませんでした。まずJSON形式で入力してください。';
-  }
-  const rows = [];
-  walk(obj, '$', rows);
-  return ['JSON path summary:', ...rows.slice(0, 80)].join('\\n');
-}
-
-function walk(node, path, rows) {
-  if (Array.isArray(node)) {
-    rows.push(`${path} : array(${node.length})`);
-    node.forEach((x, i) => walk(x, `${path}[${i}]`, rows));
-    return;
-  }
-  if (node && typeof node === 'object') {
-    rows.push(`${path} : object`);
-    Object.keys(node).forEach((k) => walk(node[k], `${path}.${k}`, rows));
-    return;
-  }
-  rows.push(`${path} : ${typeof node}`);
-}
-
-function splitLines(input) {
-  return input.split(/\\n+/).map((x) => x.trim()).filter(Boolean);
-}
-
-function buildAgenda(input) {
-  const topics = splitLines(input);
-  const per = Math.max(5, Math.floor(45 / Math.max(topics.length, 1)));
-  const lines = topics.map((t, i) => `${String(i + 1).padStart(2, '0')}. ${t} (${per}分)`);
-  return ['Agenda draft:', ...lines, 'Closing: 決定事項と担当を1分で確認'].join('\\n');
-}
-
-function buildRiskMatrix(input) {
-  const rows = splitLines(input).map((line) => {
-    const [name, impactRaw, probRaw] = line.split('|').map((x) => (x || '').trim());
-    const impact = Number(impactRaw || 3);
-    const prob = Number(probRaw || 3);
-    const score = impact * prob;
-    return { name: name || line, impact, prob, score };
-  }).sort((a, b) => b.score - a.score);
-  const out = rows.map((r, i) => `${i + 1}. ${r.name} | impact=${r.impact} prob=${r.prob} score=${r.score}`);
-  return ['Risk priority:', ...out.slice(0, 20)].join('\\n');
-}
-
-function buildDecisionBrief(input) {
-  const rows = splitLines(input);
-  const outline = rows.map((x, i) => `${i + 1}) ${x}`);
-  return [
-    'Decision memo draft',
-    '背景: 何を決めるかを1行で明記',
-    '選択肢:',
-    ...outline,
-    '採用理由: 影響と実行速度のバランス',
-    '却下理由: 維持コストまたはリスクが高い'
-  ].join('\\n');
-}
-
-function buildChecklist(input) {
-  const rows = splitLines(input);
-  const checks = rows.map((x, i) => `- [ ] ${x} を確認する (${i + 1})`);
-  return ['Checklist:', ...checks.slice(0, 30)].join('\\n');
-}
-
-function buildQuestionRotation(input) {
-  const rows = splitLines(input);
-  const out = [];
-  rows.forEach((x) => {
-    out.push(`基礎: ${x}とは?`);
-    out.push(`応用: ${x}を使う判断基準は?`);
-    out.push(`確認: ${x}を説明できるか?`);
+function setupCardDeck() {
+  const tokenInput = byId('tokenInput');
+  const tokenList = byId('tokenList');
+  const cardStack = byId('cardStack');
+  const historyList = byId('historyList');
+  byId('addTokenBtn').addEventListener('click', () => {
+    const v = (tokenInput.value || '').trim();
+    if (!v) return;
+    state.tokens.push(v);
+    tokenInput.value = '';
+    renderTokenPool(tokenList);
   });
-  return ['Question rotation:', ...out.slice(0, 24)].join('\\n');
-}
-
-function buildHabitSlots(input) {
-  const rows = splitLines(input);
-  if (rows.length === 0) {
-    return '条件を1行以上入力してください。';
-  }
-  return [
-    'Habit slots:',
-    '朝: 5分の準備タスク',
-    '昼: 進捗確認',
-    '夜: 翌日の障害を1つ潰す',
-    `メモ: ${rows[0]}`
-  ].join('\\n');
-}
-
-function buildTriage(input) {
-  const rows = splitLines(input);
-  const lanes = { now: [], later: [], delegate: [] };
-  rows.forEach((r, i) => {
-    if (i % 3 === 0) lanes.now.push(r);
-    else if (i % 3 === 1) lanes.later.push(r);
-    else lanes.delegate.push(r);
+  byId('drawBtn').addEventListener('click', () => {
+    if (state.lock) return;
+    const picks = shuffle([...state.tokens]).slice(0, Math.min(3, state.tokens.length));
+    cardStack.innerHTML = picks.map((x) => `<div class="card">${escapeHtml(x)}</div>`).join('');
+    state.history.unshift(picks.join(' × '));
+    state.history = state.history.slice(0, 12);
+    historyList.innerHTML = state.history.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
   });
-  return [
-    'Triage lanes:',
-    '[Now]', ...lanes.now.map((x) => `- ${x}`),
-    '[Later]', ...lanes.later.map((x) => `- ${x}`),
-    '[Delegate]', ...lanes.delegate.map((x) => `- ${x}`)
-  ].join('\\n');
+  byId('lockBtn').addEventListener('click', () => { state.lock = !state.lock; });
+  renderTokenPool(tokenList);
 }
 
-function buildCopyAngles(input) {
-  const seed = splitLines(input).slice(0, 3).join(' / ');
-  return [
-    'Copy angles:',
-    `1) 課題起点: ${seed} で困る時間を減らす`,
-    `2) 成果起点: ${seed} を最短で形にする`,
-    `3) 安心起点: ${seed} のミスを事前に防ぐ`
-  ].join('\\n');
+function renderTokenPool(el) {
+  el.innerHTML = state.tokens.map((x) => `<span class="chip">${escapeHtml(x)}</span>`).join('');
 }
 
-function buildStoryOutline(input) {
-  const rows = splitLines(input);
-  return [
-    'STAR outline:',
-    `S: ${rows[0] || '背景を1行で記述'}`,
-    `T: ${rows[1] || '目標を1行で記述'}`,
-    `A: ${rows[2] || '取った行動を3点で記述'}`,
-    `R: ${rows[3] || '成果を数値で記述'}`
-  ].join('\\n');
+function setupWizard() {
+  const questions = [
+    { key: 'speed', q: '最優先はどれ?', c: ['速度', '品質', 'コスト'] },
+    { key: 'risk', q: '許容できるリスクは?', c: ['低い', '中くらい', '高い'] },
+    { key: 'ownership', q: '主導者は?', c: ['自分', 'チーム', '外部'] }
+  ];
+  const stepBadge = byId('stepBadge');
+  const questionText = byId('questionText');
+  const choiceGroup = byId('choiceGroup');
+  const summary = byId('wizardSummary');
+  byId('prevStepBtn').addEventListener('click', () => { state.wizardStep = Math.max(0, state.wizardStep - 1); renderStep(); });
+  byId('nextStepBtn').addEventListener('click', () => {
+    const cur = questions[state.wizardStep];
+    const selected = document.querySelector('input[name="wizardChoice"]:checked');
+    if (selected) state.wizardAnswers[cur.key] = selected.value;
+    state.wizardStep = Math.min(questions.length - 1, state.wizardStep + 1);
+    renderStep();
+  });
+  function renderStep() {
+    const cur = questions[state.wizardStep];
+    stepBadge.textContent = `Step ${state.wizardStep + 1}/${questions.length}`;
+    questionText.textContent = cur.q;
+    choiceGroup.innerHTML = cur.c.map((x) => `<label class="choice"><input type="radio" name="wizardChoice" value="${escapeHtml(x)}" ${state.wizardAnswers[cur.key]===x?'checked':''}>${escapeHtml(x)}</label>`).join('');
+    summary.textContent = Object.entries(state.wizardAnswers).map(([k,v]) => `${k}: ${v}`).join('\n') || 'まだ回答がありません';
+  }
+  renderStep();
 }
 
-function buildConstraints(input) {
-  const rows = splitLines(input);
-  const base = rows[0] || input;
-  return [
-    'Challenge cards:',
-    `- 5分: ${base} で1つ作る`,
-    `- 10分: ${base} を2通りで試す`,
-    `- 15分: ${base} を他人に説明する`
-  ].join('\\n');
+function setupMatrix() {
+  const inputName = byId('matrixItemName');
+  const impact = byId('impactRange');
+  const urgency = byId('urgencyRange');
+  byId('addMatrixItemBtn').addEventListener('click', () => {
+    const name = (inputName.value || '').trim();
+    if (!name) return;
+    const i = Number(impact.value);
+    const u = Number(urgency.value);
+    const key = i >= 3 && u >= 3 ? 'HH' : i >= 3 ? 'HL' : u >= 3 ? 'LH' : 'LL';
+    state.matrix[key].push(name);
+    inputName.value = '';
+    renderMatrix();
+  });
+  renderMatrix();
 }
 
-function buildIncidentCard(input) {
-  const rows = splitLines(input);
-  return [
-    'Incident first-response card:',
-    `1. 事象要約: ${rows[0] || '症状を1行で記述'}`,
-    '2. 影響範囲を確認',
-    '3. 一時回避策を定義',
-    '4. 恒久対応の仮説を列挙',
-    '5. 共有先と次回更新時刻を明記'
-  ].join('\\n');
+function renderMatrix() {
+  byId('qHH').innerHTML = state.matrix.HH.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
+  byId('qHL').innerHTML = state.matrix.HL.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
+  byId('qLH').innerHTML = state.matrix.LH.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
+  byId('qLL').innerHTML = state.matrix.LL.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
 }
 
-function fallbackAnalyze(input) {
-  const chars = input.length;
-  const lines = input.split('\\n').length;
-  const words = input.split(/\\s+/).filter(Boolean).length;
-  return `分析結果\\n- chars: ${chars}\\n- words: ${words}\\n- lines: ${lines}`;
+function setupWeightedCalc() {
+  const meter = byId('weightMeter');
+  const scoreTable = byId('scoreTable');
+  const recalc = () => {
+    const ws = Number(byId('wSpeed').value), wq = Number(byId('wQuality').value), wc = Number(byId('wCost').value);
+    const sum = ws + wq + wc || 1;
+    meter.textContent = `weight ratio => speed:${ws} quality:${wq} cost:${wc}`;
+    const rows = state.options.map((o) => {
+      const score = (o.speed * ws + o.quality * wq + (6 - o.cost) * wc) / sum;
+      return { name: o.name, score: score.toFixed(2) };
+    }).sort((a,b) => Number(b.score) - Number(a.score));
+    scoreTable.innerHTML = rows.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td>${r.score}</td></tr>`).join('');
+  };
+  ['wSpeed','wQuality','wCost'].forEach((id) => byId(id).addEventListener('input', recalc));
+  byId('addOptionBtn').addEventListener('click', () => {
+    const name = (byId('optionName').value || '').trim();
+    const speed = Number(byId('optionSpeed').value || 0);
+    const quality = Number(byId('optionQuality').value || 0);
+    const cost = Number(byId('optionCost').value || 0);
+    if (!name || !speed || !quality || !cost) return;
+    state.options.push({ name, speed, quality, cost });
+    byId('optionName').value = '';
+    byId('optionSpeed').value = '';
+    byId('optionQuality').value = '';
+    byId('optionCost').value = '';
+    recalc();
+  });
+  byId('recalcBtn').addEventListener('click', recalc);
+  recalc();
 }
 
-function showOutput(content, type = 'info') {
-  outputGroup.style.display = '';
-  toolOutput.className = `output-area output-${type}`;
-  toolOutput.textContent = content;
-  outputGroup.style.animation = 'none';
-  outputGroup.offsetHeight;
-  outputGroup.style.animation = 'fadeSlideIn 0.3s ease';
+function setupSlotPlanner() {
+  byId('addTaskBtn').addEventListener('click', () => {
+    const task = (byId('taskInput').value || '').trim();
+    const slot = byId('slotSelect').value;
+    if (!task) return;
+    state.slots[slot].push({ text: task, done: false });
+    byId('taskInput').value = '';
+    renderSlots();
+  });
+  byId('carryBtn').addEventListener('click', () => {
+    carry('morning', 'afternoon');
+    carry('afternoon', 'evening');
+    renderSlots();
+  });
+  renderSlots();
+}
+
+function carry(from, to) {
+  const stay = [];
+  state.slots[from].forEach((t) => {
+    if (t.done) stay.push(t);
+    else state.slots[to].push({ text: t.text, done: false });
+  });
+  state.slots[from] = stay;
+}
+
+function renderSlots() {
+  renderSlot('morning', byId('slotMorning'));
+  renderSlot('afternoon', byId('slotAfternoon'));
+  renderSlot('evening', byId('slotEvening'));
+}
+
+function renderSlot(key, el) {
+  el.innerHTML = state.slots[key].map((t, i) => `<label class="task"><input type="checkbox" ${t.done?'checked':''} data-slot="${key}" data-idx="${i}">${escapeHtml(t.text)}</label>`).join('');
+  el.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+    box.addEventListener('change', (e) => {
+      const slot = e.target.dataset.slot;
+      const idx = Number(e.target.dataset.idx);
+      state.slots[slot][idx].done = e.target.checked;
+    });
+  });
+}
+
+function setupFlowBoard() {
+  byId('addFlowCardBtn').addEventListener('click', () => {
+    const title = (byId('cardTitleInput').value || '').trim();
+    if (!title) return;
+    state.board.todo.push({ id: Date.now(), title });
+    byId('cardTitleInput').value = '';
+    renderBoard();
+  });
+  renderBoard();
+}
+
+function renderBoard() {
+  renderLane('todo', byId('laneTodo'), 'doing');
+  renderLane('doing', byId('laneDoing'), 'done');
+  renderLane('done', byId('laneDone'), null);
+}
+
+function renderLane(key, el, next) {
+  el.innerHTML = state.board[key].map((c, i) => `<div class="card"><div>${escapeHtml(c.title)}</div>${next ? `<button data-lane="${key}" data-idx="${i}" data-next="${next}">→ ${next}</button>` : ''}</div>`).join('');
+  el.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const lane = btn.dataset.lane;
+      const idx = Number(btn.dataset.idx);
+      const to = btn.dataset.next;
+      const [card] = state.board[lane].splice(idx, 1);
+      state.board[to].push(card);
+      renderBoard();
+    });
+  });
+}
+
+function setupRoulette() {
+  const wheel = byId('wheelFace');
+  const score = byId('scoreValue');
+  const round = byId('roundValue');
+  const missionPool = byId('missionPool');
+  const history = byId('roundHistory');
+
+  byId('addMissionBtn').addEventListener('click', () => {
+    const m = (byId('missionInput').value || '').trim();
+    if (!m) return;
+    state.missions.push(m);
+    byId('missionInput').value = '';
+    renderPool();
+  });
+  byId('spinBtn').addEventListener('click', () => {
+    if (state.missions.length === 0) return;
+    const picked = state.missions[Math.floor(Math.random() * state.missions.length)];
+    wheel.textContent = picked;
+    state.round += 1;
+    state.score += 10;
+    state.history.unshift(`R${state.round}: ${picked}`);
+    state.history = state.history.slice(0, 12);
+    round.textContent = String(state.round);
+    score.textContent = String(state.score);
+    history.innerHTML = state.history.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
+  });
+  byId('clearRoundBtn').addEventListener('click', () => {
+    state.round = 0; state.score = 0; state.history = []; wheel.textContent = 'SPIN';
+    round.textContent = '0'; score.textContent = '0'; history.innerHTML = '';
+  });
+  function renderPool() {
+    missionPool.innerHTML = state.missions.map((x) => `<li>${escapeHtml(x)}</li>`).join('');
+  }
+  renderPool();
+}
+
+function setupFallback() {
+  const input = byId('toolInput');
+  const output = byId('toolOutput');
+  const btn = byId('actionBtn');
+  if (!input || !output || !btn) return;
+  btn.addEventListener('click', () => {
+    const txt = (input.value || '').trim();
+    output.textContent = txt ? `chars=${txt.length}` : '入力してください';
+  });
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
